@@ -273,11 +273,11 @@ sealed class PadForm : Form
         Add(assignments, 0, 6, 2);
         var controls = new FlowLayoutPanel { Dock = DockStyle.Fill };
         ButtonInto(controls, "▶ Играть", Play);
-        ButtonInto(controls, "■ Стоп", () => { engine.Stop(); StopPreview(); status.Text = connected ? "Подключено. Голос продолжает работать." : "Остановлено."; });
+        ButtonInto(controls, "■ Стоп (Ctrl+Alt+C)", StopPlayback);
         ButtonInto(controls, "Только у себя", Preview);
         Add(controls, 0, 7, 2);
         Add(volumeLabel, 0, 8); Add(volume, 1, 8);
-        Add(new Label { Dock = DockStyle.Fill, Text = "В Discord / игре микрофон: CABLE Output.\nХоткеи Ctrl+Alt+1…5 работают и при свёрнутом окне.", AutoSize = false }, 0, 9, 2);
+        Add(new Label { Dock = DockStyle.Fill, Text = "В Discord / игре микрофон: CABLE Output.\nCtrl+Alt+1…5 — играть; Ctrl+Alt+C — стоп. Работают при свёрнутом окне.", AutoSize = false }, 0, 9, 2);
         Add(status, 0, 10, 2);
         Controls.Add(layout);
         volume.Value = Math.Clamp(settings.Volume, 0, 100);
@@ -298,7 +298,7 @@ sealed class PadForm : Form
             AutoConnect();
             var unavailable = new List<string>();
             hotkeyWindow = Handle;
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < GlobalHotkeys.SlotCount; i++)
                 if (GlobalHotkeys.Register(hotkeyWindow, i)) registeredHotkeys.Add(i);
                 else unavailable.Add(GlobalHotkeys.Name(i));
             if (unavailable.Count > 0) status.Text = "Заняты другими программами: " + string.Join(", ", unavailable);
@@ -371,6 +371,11 @@ sealed class PadForm : Form
         status.Text = voice.Checked ? "Подключено: твой голос + звуки → CABLE Output." : "Подключено: только звуки → CABLE Output.";
     }
     void Disconnect() { connected = false; wasPlaying = false; engine.Dispose(); }
+    void StopPlayback()
+    {
+        engine.Stop(); StopPreview(); wasPlaying = false;
+        status.Text = connected && voice.Checked ? "Остановлено. Голос продолжает работать." : "Остановлено.";
+    }
     void Play()
     {
         if (files.SelectedItem is not string name) return;
@@ -474,6 +479,7 @@ sealed class PadForm : Form
         if (m.Msg == GlobalHotkeys.MessageId)
         {
             int slot = (int)m.WParam - GlobalHotkeys.FirstId;
+            if (slot == GlobalHotkeys.StopSlot) { StopPlayback(); return; }
             if (slot >= 0 && slot < 5 && settings.Hotkeys[slot] is string name)
             {
                 try { PlayFile(name); }
